@@ -2,6 +2,8 @@
 # Copyright (c) 2012, Matthias Meusburger
 # All rights reserved.
 #
+# Modified by spammy, because he likes ducks and they should be saved
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
 #

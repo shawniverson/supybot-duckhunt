@@ -2,6 +2,8 @@
 # Copyright (c) 2012, Matthias Meusburger
 # All rights reserved.
 #
+# # Modified by spammy, because he likes ducks and they should be saved
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
 #
@@ -51,25 +53,29 @@ class DuckHunt(callbacks.Plugin):
     threaded = True
 
     # Those parameters are per-channel parameters
-    started = {}       # Has the hunt started?
-    duck = {}          # Is there currently a duck to shoot?
-    shoots = {}        # Number of successfull shoots in a hunt
-    scores = {}        # Scores for the current hunt
-    times = {}         # Elapsed time since the last duck was launched
-    channelscores = {} # Saved scores for the channel
-    toptimes = {}      # Times for the current hunt
-    channeltimes = {}  # Saved times for the channel
-    worsttimes = {}    # Worst times for the current hunt
-    channelworsttimes = {} # Saved worst times for the channel
-    averagetime = {}   # Average shooting time for the current hunt
-    fridayMode = {}    # Are we on friday mode? (automatic)
-    manualFriday = {}  # Are we on friday mode? (manual)
-    missprobability = {} # Probability to miss a duck when shooting
-    week = {}          # Scores for the week
-    channelweek = {}   # Saved scores for the week
-    leader = {}        # Who is the leader for the week?
-    reloading = {}     # Who is currently reloading?
-    reloadtime = {}    # Time to reload after shooting (in seconds)
+    started = {}                # Has the hunt started?
+    duck = {}                   # Is there currently a duck to shoot?
+    shoots = {}                 # Number of successful shoots (and saves) in a hunt
+    shootscores = {}            # Shoot scores for the current hunt
+    savescores = {}             # Save scores for the current hunt
+    times = {}                  # Elapsed time since the last duck was launched
+    channelshootscores = {}     # Saved scores for the channel
+    channelsavescores = {}      # Saved scores for the channel
+    toptimes = {}               # Times for the current hunt
+    channeltimes = {}           # Saved times for the channel
+    worsttimes = {}             # Worst times for the current hunt
+    channelworsttimes = {}      # Saved worst times for the channel
+    averagetime = {}            # Average shooting time for the current hunt
+    fridayMode = {}             # Are we on friday mode? (automatic)
+    manualFriday = {}           # Are we on friday mode? (manual)
+    missprobability = {}        # Probability to miss a duck when shooting
+    week = {}                   # Scores for the week
+    channelweekshots = {}       # Saved shot scores for the week
+    channelweeksaves = {}       # Saved save scores for the week
+    leadershooter = {}          # Who is the leader shooter for the week?
+    leadersaver = {}            # Who is the leader shooter for the week?
+    reloading = {}              # Who is currently reloading?
+    reloadtime = {}             # Time to reload after shooting (in seconds)
 
     # Does a duck needs to be launched?
     lastSpoke = {}
@@ -98,15 +104,25 @@ class DuckHunt(callbacks.Plugin):
         Adds new scores and times to the already saved ones
         """
 
-        # scores
+        # shootscores
         # Adding current scores to the channel scores
-        for player in list(self.scores[channel].keys()):
-            if not player in self.channelscores[channel]:
+        for player in list(self.shootscores[channel].keys()):
+            if not player in self.channelshootscores[channel]:
                 # It's a new player
-                self.channelscores[channel][player] = self.scores[channel][player]
+                self.channelshootscores[channel][player] = self.shootscores[channel][player]
             else:
                 # It's a player that already has a saved score
-                self.channelscores[channel][player] += self.scores[channel][player]
+                self.channelshootscores[channel][player] += self.shootscores[channel][player]
+
+        # savescores
+        # Adding current scores to the channel scores
+        for player in list(self.savescores[channel].keys()):
+            if not player in self.channelsavescores[channel]:
+                # It's a new player
+                self.channelsavescores[channel][player] = self.savescores[channel][player]
+            else:
+                # It's a player that already has a saved score
+                self.channelsavescores[channel][player] += self.savescores[channel][player]
 
         # times
         # Adding times scores to the channel scores
@@ -132,17 +148,25 @@ class DuckHunt(callbacks.Plugin):
                 if(self.worsttimes[channel][player] > self.channelworsttimes[channel][player]):
                     self.channelworsttimes[channel][player] = self.worsttimes[channel][player]
 
-        # week scores
-        for player in list(self.scores[channel].keys()):
+        # week shoot scores
+        for player in list(self.shootscores[channel].keys()):
             #FIXME: If the hunt starts a day and ends the day after, this will produce an error:
-            if not player in self.channelweek[channel][self.woy][self.dow]:
+            if not player in self.channelweekshots[channel][self.woy][self.dow]:
                 # It's a new player
-                self.channelweek[channel][self.woy][self.dow][player] = self.scores[channel][player]
+                self.channelweekshots[channel][self.woy][self.dow][player] = self.shootscores[channel][player]
             else:
                 # It's a player that already has a saved score
-                self.channelweek[channel][self.woy][self.dow][player] += self.scores[channel][player]
+                self.channelweekshots[channel][self.woy][self.dow][player] += self.shootscores[channel][player]
 
-
+        # week save scores
+        for player in list(self.savescores[channel].keys()):
+            #FIXME: If the hunt starts a day and ends the day after, this will produce an error:
+            if not player in self.channelweeksaves[channel][self.woy][self.dow]:
+                # It's a new player
+                self.channelweeksaves[channel][self.woy][self.dow][player] = self.savescores[channel][player]
+            else:
+                # It's a player that already has a saved score
+                self.channelweeksaves[channel][self.woy][self.dow][player] += self.savescores[channel][player]
 
 
     def _write_scores(self, channel):
@@ -150,9 +174,14 @@ class DuckHunt(callbacks.Plugin):
         Write scores and times to the disk
         """
 
-        # scores
-        outputfile = open(self.path.dirize(self.fileprefix + channel + ".scores"), "wb")
-        pickle.dump(self.channelscores[channel], outputfile)
+        # shootscores
+        outputfile = open(self.path.dirize(self.fileprefix + channel + ".shootscores"), "wb")
+        pickle.dump(self.channelshootscores[channel], outputfile)
+        outputfile.close()
+
+        # savescores
+        outputfile = open(self.path.dirize(self.fileprefix + channel + ".savescores"), "wb")
+        pickle.dump(self.channelsavescores[channel], outputfile)
         outputfile.close()
 
         # times
@@ -165,27 +194,33 @@ class DuckHunt(callbacks.Plugin):
         pickle.dump(self.channelworsttimes[channel], outputfile)
         outputfile.close()
 
-        # week scores
-        outputfile = open(self.path.dirize(self.fileprefix + channel + self.year + ".weekscores"), "wb")
-        pickle.dump(self.channelweek[channel], outputfile)
+        # week shot scores
+        outputfile = open(self.path.dirize(self.fileprefix + channel + self.year + ".weekshots"), "wb")
+        pickle.dump(self.channelweekshots[channel], outputfile)
         outputfile.close()
 
-
-
-
-
-
+        # week save scores
+        outputfile = open(self.path.dirize(self.fileprefix + channel + self.year + ".weeksaves"), "wb")
+        pickle.dump(self.channelweeksaves[channel], outputfile)
+        outputfile.close()
 
     def _read_scores(self, channel):
         """
         Reads scores and times from disk
         """
         filename = self.path.dirize(self.fileprefix + channel)
-        # scores
-        if not self.channelscores.get(channel):
-            if os.path.isfile(filename + ".scores"):
-                inputfile = open(filename + ".scores", "rb")
-                self.channelscores[channel] = pickle.load(inputfile)
+        # shootscores
+        if not self.channelshootscores.get(channel):
+            if os.path.isfile(filename + ".shootscores"):
+                inputfile = open(filename + ".shootscores", "rb")
+                self.channelshootscores[channel] = pickle.load(inputfile)
+                inputfile.close()
+
+        # savescores
+        if not self.channelsavescores.get(channel):
+            if os.path.isfile(filename + ".savescores"):
+                inputfile = open(filename + ".savescores", "rb")
+                self.channelsavescores[channel] = pickle.load(inputfile)
                 inputfile.close()
 
         # times
@@ -202,13 +237,19 @@ class DuckHunt(callbacks.Plugin):
                 self.channelworsttimes[channel] = pickle.load(inputfile)
                 inputfile.close()
 
-        # week scores
-        if not self.channelweek.get(channel):
-            if os.path.isfile(filename + self.year + ".weekscores"):
-                inputfile = open(filename + self.year + ".weekscores", "rb")
-                self.channelweek[channel] = pickle.load(inputfile)
+        # week shots
+        if not self.channelweekshots.get(channel):
+            if os.path.isfile(filename + self.year + ".weekshots"):
+                inputfile = open(filename + self.year + ".weekshots", "rb")
+                self.channelweekshots[channel] = pickle.load(inputfile)
                 inputfile.close()
 
+         # week saves
+        if not self.channelweeksaves.get(channel):
+            if os.path.isfile(filename + self.year + ".weeksaves"):
+                inputfile = open(filename + self.year + ".weeksaves", "rb")
+                self.channelweeksaves[channel] = pickle.load(inputfile)
+                inputfile.close()
 
 
     def _initdayweekyear(self, channel):
@@ -216,28 +257,44 @@ class DuckHunt(callbacks.Plugin):
         self.woy = int(time.strftime("%V")) # Week of year
         year = time.strftime("%Y") 
 
-        # Init week scores
+        # Init week shot scores
         try:
-            self.channelweek[channel]
+            self.channelweekshots[channel]
         except:
-            self.channelweek[channel] = {}
+            self.channelweekshots[channel] = {}
         try:
-            self.channelweek[channel][self.woy]
+            self.channelweekshots[channel][self.woy]
         except:
-            self.channelweek[channel][self.woy] = {}
+            self.channelweekshots[channel][self.woy] = {}
         try:
-            self.channelweek[channel][self.woy][self.dow]
+            self.channelweekshots[channel][self.woy][self.dow]
         except:
-            self.channelweek[channel][self.woy][self.dow] = {}
+            self.channelweekshots[channel][self.woy][self.dow] = {}
+
+          # Init week save scores
+        try:
+            self.channelweeksaves[channel]
+        except:
+            self.channelweeksaves[channel] = {}
+        try:
+            self.channelweeksaves[channel][self.woy]
+        except:
+            self.channelweeksaves[channel][self.woy] = {}
+        try:
+            self.channelweeksaves[channel][self.woy][self.dow]
+        except:
+            self.channelweeksaves[channel][self.woy][self.dow] = {}
 
 
-    
     def _initthrottle(self, irc, msg, args, channel):
 
         self._initdayweekyear(channel)
             
-        if not self.leader.get(channel):
-            self.leader[channel] = None
+        if not self.leadershooter.get(channel):
+            self.leadershooter[channel] = None
+
+        if not self.leadersaver.get(channel):
+            self.leadersaver[channel] = None
 
         # autoFriday?
         if (not self.fridayMode.get(channel)):
@@ -301,11 +358,17 @@ class DuckHunt(callbacks.Plugin):
 
                 self._initthrottle(irc, msg, args, currentChannel)
 
-                # Init saved scores
+                # Init saved shootscores
                 try:
-                    self.channelscores[currentChannel]
+                    self.channelshootscores[currentChannel]
                 except:
-                    self.channelscores[currentChannel] = {}
+                    self.channelshootscores[currentChannel] = {}
+
+                # Init saved savescores
+                try:
+                    self.channelsavescores[currentChannel]
+                except:
+                    self.channelsavescores[currentChannel] = {}
 
                 # Init saved times
                 try:
@@ -329,9 +392,13 @@ class DuckHunt(callbacks.Plugin):
                 # Init lastSpoke
                 self.lastSpoke[currentChannel] = time.time()
 
-                # Reinit current hunt scores
-                if self.scores.get(currentChannel):
-                    self.scores[currentChannel] = {}
+                # Reinit current hunt shootscores
+                if self.shootscores.get(currentChannel):
+                    self.shootscores[currentChannel] = {}
+
+                # Reinit current hunt savescores
+                if self.savescores.get(currentChannel):
+                    self.savescores[currentChannel] = {}
 
                 # Reinit reloading
                 self.reloading[currentChannel] = {}
@@ -437,7 +504,7 @@ class DuckHunt(callbacks.Plugin):
         if irc.isChannel(currentChannel):
             if(self.started.get(currentChannel) == True):
                 if(self.duck[currentChannel] == True):
-                    irc.reply("There is currently a duck! You can shoot it with the 'bang' command")
+                    irc.reply("There is currently a duck! You can shoot it with the 'bang' command or save with the 'bef' command")
                 else:
                     irc.reply("There is no duck right now! Wait for one to be launched!")
             else:
@@ -458,15 +525,22 @@ class DuckHunt(callbacks.Plugin):
         if irc.isChannel(currentChannel):
             self._read_scores(currentChannel)
             try:
-                self.channelscores[currentChannel]
+                self.channelshootscores[currentChannel]
             except:
-                self.channelscores[currentChannel] = {}
-
+                self.channelshootscores[currentChannel] = {}
+            try:
+                self.channelsavescores[currentChannel]
+            except:
+                self.channelsavescores[currentChannel] = {}
 
             try:
-                irc.reply(self.channelscores[currentChannel][nick])
+                irc.reply("\_x< Shot score: %s " % (self.channelshootscores[currentChannel][nick]))
             except:
-                irc.reply("There is no score for %s on %s" % (nick, currentChannel))
+                irc.reply("There is no shot score for %s on %s" % (nick, currentChannel))
+            try:
+                irc.reply("\_O< Save score: %s " % (self.channelsavescores[currentChannel][nick]))
+            except:
+                irc.reply("There is no save score for %s on %s" % (nick, currentChannel))
         else:
             irc.error('You have to be on a channel')
 
@@ -483,42 +557,64 @@ class DuckHunt(callbacks.Plugin):
         if irc.isChannel(channel):
             self._read_scores(channel)
 
-            # Total scores
+            # Total shoot scores
             try:
-                self.channelscores[channel][nickto] += self.channelscores[channel][nickfrom]
-                del self.channelscores[channel][nickfrom]
+                self.channelshootscores[channel][nickto] += self.channelshootscores[channel][nickfrom]
+                del self.channelshootscores[channel][nickfrom]
                 self._write_scores(channel)
-                irc.reply("Total scores merged")
+                irc.reply("Total shoot scores merged")
 
             except:
-                irc.error("Can't merge total scores")
+                irc.error("Can't merge total shoot scores")
 
-            # Day scores
+            # Total save scores
             try:
-                self._initdayweekyear(channel)
-                day = self.dow
-                week = self.woy
+                self.channelsavescores[channel][nickto] += self.channelsavescores[channel][nickfrom]
+                del self.channelsavescores[channel][nickfrom]
+                self._write_scores(channel)
+                irc.reply("Total save scores merged")
 
+            except:
+                irc.error("Can't merge total save scores")
+
+
+            self._initdayweekyear(channel)
+            day = self.dow
+            week = self.woy
+            
+            # Day shot scores
+            try:            
                 try:
-                    self.channelweek[channel][week][day][nickto] += self.channelweek[channel][week][day][nickfrom]
+                    self.channelweekshots[channel][week][day][nickto] += self.channelweekshots[channel][week][day][nickfrom]
                 except:
-                    self.channelweek[channel][week][day][nickto] = self.channelweek[channel][week][day][nickfrom]
+                    self.channelweekshots[channel][week][day][nickto] = self.channelweekshots[channel][week][day][nickfrom]
 
-                del self.channelweek[channel][week][day][nickfrom]
+                del self.channelweekshots[channel][week][day][nickfrom]
                 self._write_scores(channel)
-                irc.reply("Day scores merged")
+                irc.reply("Day shot scores merged")
 
             except:
-                irc.error("Can't merge day scores")
+                irc.error("Can't merge day shot scores")
 
+            # Day save scores
+            try:            
+                try:
+                    self.channelweeksaves[channel][week][day][nickto] += self.channelweeksaves[channel][week][day][nickfrom]
+                except:
+                    self.channelweeksaves[channel][week][day][nickto] = self.channelweeksaves[channel][week][day][nickfrom]
 
+                del self.channelweeksaves[channel][week][day][nickfrom]
+                irc.reply("Day shot saves merged")
+
+            except:
+                irc.error("Can't merge day shot scores")
+
+            self._write_scores(channel)
 
         else:
             irc.error('You have to be on a channel')
 
-
     mergescores = wrap(mergescores, ['channel', 'nick', 'nick', 'admin'])
-
 
 
     def mergetimes(self, irc, msg, args, channel, nickto, nickfrom):
@@ -556,7 +652,6 @@ class DuckHunt(callbacks.Plugin):
     mergetimes = wrap(mergetimes, ['channel', 'nick', 'nick', 'admin'])
 
 
-
     def rmtime(self, irc, msg, args, channel, nick):
         """
         [<channel>] <nick>
@@ -585,7 +680,8 @@ class DuckHunt(callbacks.Plugin):
         if irc.isChannel(channel):
             try:
                 self._read_scores(channel)
-                del self.channelscores[channel][nick]
+                del self.channelshootscores[channel][nick]
+                del self.channelsavescores[channel][nick]
                 self._write_scores(channel)
                 irc.replySuccess()
 
@@ -596,8 +692,6 @@ class DuckHunt(callbacks.Plugin):
             irc.error('Are you sure this is a channel?')
 
     rmscore = wrap(rmscore, ['channel', 'nick', 'admin'])
-
-
 
 
     def dayscores(self, irc, msg, args, channel):
@@ -614,25 +708,46 @@ class DuckHunt(callbacks.Plugin):
             day = self.dow
             week = self.woy
 
-            if self.channelweek.get(channel):
-                if self.channelweek[channel].get(week):
-                    if self.channelweek[channel][week].get(day):
+            if self.channelweekshots.get(channel):
+                if self.channelweekshots[channel].get(week):
+                    if self.channelweekshots[channel][week].get(day):
                     # Getting all scores, to get the winner of the week
                         msgstring = ''
-                        scores = sorted(iter(self.channelweek[channel][week][day].items()), key=lambda k_v2:(k_v2[1],k_v2[0]), reverse=True)
+                        scores = sorted(iter(self.channelweekshots[channel][week][day].items()), key=lambda k_v2:(k_v2[1],k_v2[0]), reverse=True)
                         for item in scores:
                             msgstring += "x" + item[0] + "x: "+ str(item[1]) + " | "
 
                         if msgstring != "":
-                            irc.reply("Scores for today: " + msgstring)
+                            irc.reply("Shot scores for today: " + msgstring)
                         else:
-                            irc.reply("There aren't any day scores for today yet.")
+                            irc.reply("There aren't any day shot scores for today yet.")
                     else:
-                        irc.reply("There aren't any day scores for today yet.")
+                        irc.reply("There aren't any day shot scores for today yet.")
                 else:
-                    irc.reply("There aren't any day scores for today yet.")
+                    irc.reply("There aren't any day shot scores for today yet.")
             else:
-                irc.reply("There aren't any day scores for this channel yet.")
+                irc.reply("There aren't any day shot scores for this channel yet.")
+            
+            if self.channelweeksaves.get(channel):
+                if self.channelweeksaves[channel].get(week):
+                    if self.channelweeksaves[channel][week].get(day):
+                    # Getting all scores, to get the winner of the week
+                        msgstring = ''
+                        scores = sorted(iter(self.channelweeksaves[channel][week][day].items()), key=lambda k_v2:(k_v2[1],k_v2[0]), reverse=True)
+                        for item in scores:
+                            msgstring += "x" + item[0] + "x: "+ str(item[1]) + " | "
+
+                        if msgstring != "":
+                            irc.reply("Save scores for today: " + msgstring)
+                        else:
+                            irc.reply("There aren't any day save scores for today yet.")
+                    else:
+                        irc.reply("There aren't any day save scores for today yet.")
+                else:
+                    irc.reply("There aren't any day save scores for today yet.")
+            else:
+                irc.reply("There aren't any day save scores for this channel yet.")
+
         else:
             irc.reply("Are you sure this is a channel?")
     dayscores = wrap(dayscores, ['channel'])
@@ -654,57 +769,111 @@ class DuckHunt(callbacks.Plugin):
             if (not week):
                 week = self.woy
 
-            if self.channelweek.get(channel):
-                if self.channelweek[channel].get(week):
+            if self.channelweekshots.get(channel):
+                if self.channelweekshots[channel].get(week):
                     # Showing the winner for each day
                     if not nick:
                         msgstring = ''
                         # for each day of week
                         for i in (1,2,3,4,5,6,7):
-                            if self.channelweek[channel][week].get(i):
+                            if self.channelweekshots[channel][week].get(i):
                                 # Getting winner of the day
-                                winnernick, winnerscore = max(iter(self.channelweek[channel][week][i].items()), key=lambda k_v:(k_v[1],k_v[0]))
+                                winnernick, winnerscore = max(iter(self.channelweekshots[channel][week][i].items()), key=lambda k_v:(k_v[1],k_v[0]))
                                 msgstring += self.dayname[i - 1] + ": x" + winnernick + "x ("+ str(winnerscore) + ") | "
 
                         # Getting all scores, to get the winner of the week
-                        for player in list(self.channelweek[channel][week][i].keys()):
+                        for player in list(self.channelweekshots[channel][week][i].keys()):
                             try:
-                                weekscores[player] += self.channelweek[channel][week][i][player]
+                                weekscores[player] += self.channelweekshots[channel][week][i][player]
                             except:
-                                weekscores[player] = self.channelweek[channel][week][i][player]
+                                weekscores[player] = self.channelweekshots[channel][week][i][player]
                              
 
                         if msgstring != "":
-                            irc.reply("Scores for week " + str(week) + ": " + msgstring)
+                            irc.reply("Shot scores for week " + str(week) + ": " + msgstring)
                             # Who's the winner at this point?
                             winnernick, winnerscore = max(iter(weekscores.items()), key=lambda k_v1:(k_v1[1],k_v1[0]))
-                            irc.reply("Leader: x%sx with %i points." % (winnernick, winnerscore)) 
+                            irc.reply("Leader shooter: x%sx with %i points." % (winnernick, winnerscore)) 
 
                         else:
-                            irc.reply("There aren't any week scores for this week yet.")
+                            irc.reply("There aren't any week shot scores for this week yet.")
                     else:
                         # Showing the scores of <nick>
                         msgstring = ''
                         total = 0
                         for i in (1,2,3,4,5,6,7):
-                            if self.channelweek[channel][week].get(i):
-                                if self.channelweek[channel][week][i].get(nick):
-                                    msgstring += self.dayname[i - 1] + ": "+ str(self.channelweek[channel][week][i].get(nick)) + " | "
-                                    total += self.channelweek[channel][week][i].get(nick)
+                            if self.channelweekshots[channel][week].get(i):
+                                if self.channelweekshots[channel][week][i].get(nick):
+                                    msgstring += self.dayname[i - 1] + ": "+ str(self.channelweekshots[channel][week][i].get(nick)) + " | "
+                                    total += self.channelweekshots[channel][week][i].get(nick)
 
                         if msgstring != "":
-                            irc.reply(nick + " scores for week " + str(self.woy) + ": " + msgstring)
-                            irc.reply("Total: " + str(total) + " points.")
+                            irc.reply(nick + " shot scores for week " + str(self.woy) + ": " + msgstring)
+                            irc.reply("Total: " + str(total) + " shot points.")
                         else:
-                            irc.reply("There aren't any week scores for this nick.")
+                            irc.reply("There aren't any week shot scores for this nick.")
 
 
                 else:
-                    irc.reply("There aren't any week scores for this week yet.")
+                    irc.reply("There aren't any week shot scores for this week yet.")
             else:
-                irc.reply("There aren't any week scores for this channel yet.")
+                irc.reply("There aren't any week shot scores for this channel yet.")
+            
+            if self.channelweeksaves.get(channel):
+                if self.channelweeksaves[channel].get(week):
+                    # Showing the winner for each day
+                    if not nick:
+                        msgstring = ''
+                        # for each day of week
+                        for i in (1,2,3,4,5,6,7):
+                            if self.channelweeksaves[channel][week].get(i):
+                                # Getting winner of the day
+                                winnernick, winnerscore = max(iter(self.channelweeksaves[channel][week][i].items()), key=lambda k_v:(k_v[1],k_v[0]))
+                                msgstring += self.dayname[i - 1] + ": x" + winnernick + "x ("+ str(winnerscore) + ") | "
+
+                        # Getting all scores, to get the winner of the week
+                        for player in list(self.channelweeksaves[channel][week][i].keys()):
+                            try:
+                                weekscores[player] += self.channelweeksaves[channel][week][i][player]
+                            except:
+                                weekscores[player] = self.channelweeksaves[channel][week][i][player]
+                             
+
+                        if msgstring != "":
+                            irc.reply("Save scores for week " + str(week) + ": " + msgstring)
+                            # Who's the winner at this point?
+                            winnernick, winnerscore = max(iter(weekscores.items()), key=lambda k_v1:(k_v1[1],k_v1[0]))
+                            irc.reply("Leader saver: x%sx with %i points." % (winnernick, winnerscore)) 
+
+                        else:
+                            irc.reply("There aren't any week save scores for this week yet.")
+                    else:
+                        # Showing the scores of <nick>
+                        msgstring = ''
+                        total = 0
+                        for i in (1,2,3,4,5,6,7):
+                            if self.channelweeksaves[channel][week].get(i):
+                                if self.channelweeksaves[channel][week][i].get(nick):
+                                    msgstring += self.dayname[i - 1] + ": "+ str(self.channelweeksaves[channel][week][i].get(nick)) + " | "
+                                    total += self.channelweeksaves[channel][week][i].get(nick)
+
+                        if msgstring != "":
+                            irc.reply(nick + " save scores for week " + str(self.woy) + ": " + msgstring)
+                            irc.reply("Total: " + str(total) + " save points.")
+                        else:
+                            irc.reply("There aren't any week save scores for this nick.")
+
+
+                else:
+                    irc.reply("There aren't any week save scores for this week yet.")
+            else:
+                irc.reply("There aren't any week save scores for this channel yet.")
+
+
+
         else:
             irc.reply("Are you sure this is a channel?")
+
     weekscores = wrap(weekscores, [optional('int'), optional('nick'), 'channel'])
 
 
@@ -718,9 +887,14 @@ class DuckHunt(callbacks.Plugin):
 
         if irc.isChannel(channel):
             try:
-                self.channelscores[channel]
+                self.channelshootscores[channel]
             except:
-                self.channelscores[channel] = {}
+                self.channelshootscores[channel] = {}
+
+                try:
+                self.channelsavescores[channel]
+            except:
+                self.channelsavescores[channel] = {}
 
             self._read_scores(channel)
 
@@ -731,19 +905,33 @@ class DuckHunt(callbacks.Plugin):
                 listsize = size
 
             # Sort the scores (reversed: the higher the better)
-            scores = sorted(iter(self.channelscores[channel].items()), key=lambda k_v9:(k_v9[1],k_v9[0]), reverse=True)
-            del scores[listsize:] 
+            shootscores = sorted(iter(self.channelshootscores[channel].items()), key=lambda k_v9:(k_v9[1],k_v9[0]), reverse=True)
+            del shootscores[listsize:]
+
+            # Sort the scores (reversed: the higher the better)
+            savescores = sorted(iter(self.channelshootscores[channel].items()), key=lambda k_v9:(k_v9[1],k_v9[0]), reverse=True)
+            del savescores[listsize:] 
 
             msgstring = ""
-            for item in scores:
+            for item in shootscores:
                 # Why do we show the nicks as xnickx?
                 # Just to prevent everyone that has ever played a hunt in the channel to be pinged every time anyone asks for the score list
                 msgstring += "x" + item[0] + "x: "+ str(item[1]) + " | "
             if msgstring != "":
-                irc.reply("\_o< ~ DuckHunt top-" + str(listsize) + " scores for " + channel + " ~ >o_/")
+                irc.reply("\_o< ~ DuckHunt top-" + str(listsize) + " shoot scores for " + channel + " ~ >o_/")
                 irc.reply(msgstring)
             else:
-                irc.reply("There aren't any scores for this channel yet.")
+                irc.reply("There aren't any shoot scores for this channel yet.")
+            
+            for item in savescores:
+                # Why do we show the nicks as xnickx?
+                # Just to prevent everyone that has ever played a hunt in the channel to be pinged every time anyone asks for the score list
+                msgstring += "x" + item[0] + "x: "+ str(item[1]) + " | "
+            if msgstring != "":
+                irc.reply("\_o< ~ DuckHunt top-" + str(listsize) + " save scores for " + channel + " ~ >o_/")
+                irc.reply(msgstring)
+            else:
+                irc.reply("There aren't any save scores for this channel yet.")
         else:
             irc.reply("Are you sure this is a channel?")
     listscores = wrap(listscores, [optional('int'), 'channel'])
@@ -751,20 +939,28 @@ class DuckHunt(callbacks.Plugin):
 
     def total(self, irc, msg, args, channel):
         """
-        Shows the total amount of ducks shot in <channel> (or in the current channel if no channel is given)
+        Shows the total amount of ducks shot or saved in <channel> (or in the current channel if no channel is given)
         """
 
         if irc.isChannel(channel):
             self._read_scores(channel)
-            if (self.channelscores.get(channel)):
-                scores = self.channelscores[channel]
+            if (self.channelshootscores.get(channel)):
+                scores = self.channelshootscores[channel]
                 total = 0
                 for player in list(scores.keys()):
                     total += scores[player]
                 irc.reply(str(total) + " ducks have been shot in " + channel + "!")
             else:
                 irc.reply("There are no scores for this channel yet")
-
+            
+            if (self.channelsavescores.get(channel)):
+                scores = self.channelsavescores[channel]
+                total = 0
+                for player in list(scores.keys()):
+                    total += scores[player]
+                irc.reply(str(total) + " ducks have been saved in " + channel + "!")
+            else:
+                irc.reply("There are no save scores for this channel yet")
         else:
             irc.reply("Are you sure this is a channel?")
     total = wrap(total, ['channel'])
@@ -843,7 +1039,6 @@ class DuckHunt(callbacks.Plugin):
             if irc.isChannel(currentChannel):
                 self._launch(irc, msg, '')
     dbg = wrap(dbg)
-		
 
 
     def bang(self, irc, msg, args):
@@ -881,15 +1076,15 @@ class DuckHunt(callbacks.Plugin):
 
                         # Adds one point for the nick that shot the duck
                         try:
-                            self.scores[currentChannel][msg.nick] += 1
+                            self.shootscores[currentChannel][msg.nick] += 1
                         except:
                             try:
-                                self.scores[currentChannel][msg.nick] = 1
+                                self.shootscores[currentChannel][msg.nick] = 1
                             except:
-                                self.scores[currentChannel] = {} 
-                                self.scores[currentChannel][msg.nick] = 1
+                                self.shootscores[currentChannel] = {} 
+                                self.shootscores[currentChannel][msg.nick] = 1
 
-                        irc.reply("\_x< %s: %i (%.2f seconds)" % (msg.nick,  self.scores[currentChannel][msg.nick], bangdelay))
+                        irc.reply("\_x< %s: %i shoot score (%.2f seconds)" % (msg.nick,  self.shootscores[currentChannel][msg.nick], bangdelay))
 
                         self.averagetime[currentChannel] += bangdelay
 
@@ -943,13 +1138,13 @@ class DuckHunt(callbacks.Plugin):
 
                     # Removes one point for the nick that shot
                     try:
-                        self.scores[currentChannel][msg.nick] -= 1
+                        self.shootscores[currentChannel][msg.nick] -= 1
                     except:
                         try:
-                            self.scores[currentChannel][msg.nick] = -1
+                            self.shootscores[currentChannel][msg.nick] = -1
                         except:
-                            self.scores[currentChannel] = {} 
-                            self.scores[currentChannel][msg.nick] = -1
+                            self.shootscores[currentChannel] = {} 
+                            self.shootscores[currentChannel][msg.nick] = -1
 
                     # Base message
                     message = 'There was no duck!'
@@ -957,6 +1152,141 @@ class DuckHunt(callbacks.Plugin):
                     # Adding additional message if kick
                     if self.registryValue('kickMode', currentChannel) and irc.nick in irc.state.channels[currentChannel].ops:
                         message += ' You just shot yourself!'
+
+                    # Adding nick and score
+                    message += " %s: %i shoot score" % (msg.nick, self.shootscores[currentChannel][msg.nick])
+
+                    # If we were able to have a bangdelay (ie: a duck was launched before someone did bang)
+                    if (bangdelay):
+                        # Adding time
+                        message += " (" + str(round(bangdelay,2)) + " seconds)"
+
+                    # If kickMode is enabled for this channel, and the bot have op capability, let's kick!
+                    if self.registryValue('kickMode', currentChannel) and irc.nick in irc.state.channels[currentChannel].ops:
+                        irc.queueMsg(ircmsgs.kick(currentChannel, msg.nick, message))
+                    else:
+                        # Else, just say it
+                        irc.reply(message)
+
+
+            else:
+                irc.reply("There is no hunt right now! You can start a hunt with the 'start' command")
+        else:
+            irc.error('You have to be on a channel')
+
+    bang = wrap(bang)
+
+    def bef(self, irc, msg, args):
+        """
+        Befriends (saves) the duck!
+        """
+        currentChannel = msg.args[0]
+
+        if irc.isChannel(currentChannel):
+            if(self.started.get(currentChannel) == True):
+
+                # bangdelay: how much time between the duck was launched and this save?
+                if self.times[currentChannel]:
+                    bangdelay = time.time() - self.times[currentChannel]
+                else:
+                    bangdelay = False
+
+
+                # Is the player reloading?
+                if (self.reloading[currentChannel].get(msg.nick) and time.time() - self.reloading[currentChannel][msg.nick] < self.reloadtime[currentChannel]):
+                    irc.reply("%s, you are preparing to befriend... (preparing to befriend takes %i seconds)" % (msg.nick, self.reloadtime[currentChannel]))
+                    return 0
+                
+
+                # This player is now reloading
+                self.reloading[currentChannel][msg.nick] = time.time();
+
+                # There was a duck
+                if (self.duck[currentChannel] == True):
+
+                    # Did the player missed it?
+                    if (random.random() < self.missprobability[currentChannel]):
+                        irc.reply("%s, you missed befriending the duck!" % (msg.nick))
+                    else:
+
+                        # Adds one point for the nick that befriended the duck
+                        try:
+                            self.savescores[currentChannel][msg.nick] += 1
+                        except:
+                            try:
+                                self.savescores[currentChannel][msg.nick] = 1
+                            except:
+                                self.savescores[currentChannel] = {} 
+                                self.savescores[currentChannel][msg.nick] = 1
+
+                        irc.reply("\_O< %s: %i save points (%.2f seconds)" % (msg.nick,  self.savescores[currentChannel][msg.nick], bangdelay))
+
+                        self.averagetime[currentChannel] += bangdelay
+
+                        # Now save the bang delay for the player (if it's quicker than it's previous bangdelay)
+                        try:
+                            previoustime = self.toptimes[currentChannel][msg.nick]
+                            if(bangdelay < previoustime):
+                                self.toptimes[currentChannel][msg.nick] = bangdelay
+                        except:
+                            self.toptimes[currentChannel][msg.nick] = bangdelay
+
+
+                        # Now save the bang delay for the player (if it's worst than it's previous bangdelay)
+                        try:
+                            previoustime = self.worsttimes[currentChannel][msg.nick]
+                            if(bangdelay > previoustime):
+                                self.worsttimes[currentChannel][msg.nick] = bangdelay
+                        except:
+                            self.worsttimes[currentChannel][msg.nick] = bangdelay
+
+
+                        self.duck[currentChannel] = False
+
+                        # Reset the basetime for the waiting time before the next duck
+                        self.lastSpoke[currentChannel] = time.time()
+
+                        if self.registryValue('ducks', currentChannel):
+                            maxShoots = self.registryValue('ducks', currentChannel)
+                        else:
+                            maxShoots = 10
+
+                        # End of Hunt
+                        if (self.shoots[currentChannel]  == maxShoots):
+                            self._end(irc, msg, args)
+
+                            # If autorestart is enabled, we restart a hunt automatically!
+                            if self.registryValue('autoRestart', currentChannel):
+                                # This code shouldn't be here
+                                self.started[currentChannel] = True
+                                self._initthrottle(irc, msg, args, currentChannel)
+                                if self.scores.get(currentChannel):
+                                    self.scores[currentChannel] = {}
+                                if self.reloading.get(currentChannel):
+                                    self.reloading[currentChannel] = {}
+
+                                self.averagetime[currentChannel] = 0
+
+
+                # There was no duck or the duck has already been shot or saved!
+                else:
+
+                    # Removes one point for the nick that tried to save
+                    try:
+                        self.savescores[currentChannel][msg.nick] -= 1
+                    except:
+                        try:
+                            self.savescores[currentChannel][msg.nick] -= 1
+                        except:
+                            self.savescores[currentChannel] = {} 
+                            self.savescores[currentChannel][msg.nick] = -1
+
+                    # Base message
+                    message = 'There was no duck!'
+
+                    # Adding additional message if kick
+                    if self.registryValue('kickMode', currentChannel) and irc.nick in irc.state.channels[currentChannel].ops:
+                        message += ' You just befriended yourself!'
 
                     # Adding nick and score
                     message += " %s: %i" % (msg.nick, self.scores[currentChannel][msg.nick])
@@ -979,7 +1309,7 @@ class DuckHunt(callbacks.Plugin):
         else:
             irc.error('You have to be on a channel')
 
-    bang = wrap(bang)
+    bef = wrap(bef)
 
 
     def doPrivmsg(self, irc, msg):
@@ -995,7 +1325,6 @@ class DuckHunt(callbacks.Plugin):
                     irc.reply(message)
 
 
-    
 
     def _end(self, irc, msg, args):
         """ 
@@ -1008,37 +1337,65 @@ class DuckHunt(callbacks.Plugin):
         self.started[currentChannel] = False
 
         try:
-            self.channelscores[currentChannel]
+            self.channelshootscores[currentChannel]
         except:
-            self.channelscores[currentChannel] = {}
+            self.channelshootscores[currentChannel] = {}
 
+        try:
+            self.channelsavescores[currentChannel]
+        except:
+            self.channelsavescores[currentChannel] = {}
 
         if not self.registryValue('autoRestart', currentChannel):
             irc.reply("The hunt stops now!")
 
         # Showing scores
-        if (self.scores.get(currentChannel)):
+        if (self.shootscores.get(currentChannel)):
 
-            # Getting winner
-            winnernick, winnerscore = max(iter(self.scores.get(currentChannel).items()), key=lambda k_v12:(k_v12[1],k_v12[0]))
+            # Getting shooter winner
+            shooterwinnernick, shooterwinnerscore = max(iter(self.shootscores.get(currentChannel).items()), key=lambda k_v12:(k_v12[1],k_v12[0]))
             if self.registryValue('ducks', currentChannel):
                 maxShoots = self.registryValue('ducks', currentChannel)
             else:
                 maxShoots = 10
 
             # Is there a perfect?
-            if (winnerscore == maxShoots):
-                irc.reply("\o/ %s: %i ducks out of %i: perfect!!! +%i \o/" % (winnernick, winnerscore, maxShoots, self.perfectbonus))
-                self.scores[currentChannel][winnernick] += self.perfectbonus
+            if (shooterwinnerscore == maxShoots):
+                irc.reply("\o/ %s: %i ducks shot out of %i: perfect!!! +%i \o/" % (shooterwinnernick, shooterwinnerscore, maxShoots, self.perfectbonus))
+                self.shootscores[currentChannel][shooterwinnernick] += self.perfectbonus
             else:
                 # Showing scores
                 #irc.reply("Winner: %s with %i points" % (winnernick, winnerscore))
                 #irc.reply(self.scores.get(currentChannel))
                 #TODO: Better display
-                irc.reply(sorted(iter(self.scores.get(currentChannel).items()), key=lambda k_v4:(k_v4[1],k_v4[0]), reverse=True))
+                irc.reply(sorted(iter(self.shootscores.get(currentChannel).items()), key=lambda k_v4:(k_v4[1],k_v4[0]), reverse=True))
+        else:
+            irc.reply("Not a single duck was shot during this hunt!")
 
+        # Showing saves
+        if (self.savescores.get(currentChannel)):
 
+            # Getting save winner
+            savewinnernick, savewinnerscore = max(iter(self.savescores.get(currentChannel).items()), key=lambda k_v12:(k_v12[1],k_v12[0]))
+            if self.registryValue('ducks', currentChannel):
+                maxShoots = self.registryValue('ducks', currentChannel)
+            else:
+                maxShoots = 10
 
+            # Is there a perfect?
+            if (savewinnerscore == maxShoots):
+                irc.reply("\o/ %s: %i ducks saved out of %i: perfect!!! +%i \o/" % (savewinnernick, savewinnerscore, maxShoots, self.perfectbonus))
+                self.savescores[currentChannel][winnernick] += self.perfectbonus
+            else:
+                # Showing scores
+                #irc.reply("Winner: %s with %i points" % (winnernick, winnerscore))
+                #irc.reply(self.scores.get(currentChannel))
+                #TODO: Better display
+                irc.reply(sorted(iter(self.savescores.get(currentChannel).items()), key=lambda k_v4:(k_v4[1],k_v4[0]), reverse=True))
+        else:
+            irc.reply("Not a single duck was saved during this hunt!")
+
+        if (self.shootscores.get(currentChannel) or self.savescores.get(currentChannel))
             # Getting channel best time (to see if the best time of this hunt is better)
             channelbestnick = None
             channelbesttime = None
@@ -1066,7 +1423,6 @@ class DuckHunt(callbacks.Plugin):
             if self.channelworsttimes.get(currentChannel):
                 channelworstnick, channelworsttime = max(iter(self.channelworsttimes.get(currentChannel).items()), key=lambda k_v7:(k_v7[1],k_v7[0]))
 
-
             # Showing worst time
             recordmsg = ''
             if (self.worsttimes.get(currentChannel)):
@@ -1092,37 +1448,59 @@ class DuckHunt(callbacks.Plugin):
             self._calc_scores(currentChannel)
             self._write_scores(currentChannel)
 
-            # Did someone took the lead?
+            # Did someone took the lead shooting?
             weekscores = {}
-            if self.channelweek.get(currentChannel):
-                if self.channelweek[currentChannel].get(self.woy):
+            if self.channelweekshots.get(currentChannel):
+                if self.channelweekshots[currentChannel].get(self.woy):
                     msgstring = ''
                     # for each day of week
                     for i in (1,2,3,4,5,6,7):
-                        if self.channelweek[currentChannel][self.woy].get(i):
+                        if self.channelweekshots[currentChannel][self.woy].get(i):
                             # Getting all scores, to get the winner of the week
-                            for player in list(self.channelweek[currentChannel][self.woy][i].keys()):
+                            for player in list(self.channelweekshots[currentChannel][self.woy][i].keys()):
                                 try:
-                                    weekscores[player] += self.channelweek[currentChannel][self.woy][i][player]
+                                    weekscores[player] += self.channelweekshots[currentChannel][self.woy][i][player]
                                 except:
-                                    weekscores[player] = self.channelweek[currentChannel][self.woy][i][player]
+                                    weekscores[player] = self.channelweekshots[currentChannel][self.woy][i][player]
 
                             winnernick, winnerscore = max(iter(weekscores.items()), key=lambda k_v3:(k_v3[1],k_v3[0]))
-                            if (winnernick != self.leader[currentChannel]):
-                                if self.leader[currentChannel] != None:
-                                    irc.reply("%s took the lead for the week over %s with %i points." % (winnernick, self.leader[currentChannel], winnerscore)) 
+                            if (winnernick != self.leadershooter[currentChannel]):
+                                if self.leadershooter[currentChannel] != None:
+                                    irc.reply("%s took the lead for the week over %s with %i shot points." % (winnernick, self.leadershooter[currentChannel], winnerscore)) 
                                 else:
-                                    irc.reply("%s has the lead for the week with %i points." % (winnernick, winnerscore)) 
-                                self.leader[currentChannel] = winnernick
+                                    irc.reply("%s has the lead for the week with %i shot points." % (winnernick, winnerscore)) 
+                                self.leadershooter[currentChannel] = winnernick
 
+            # Did someone took the lead saving?
+            weekscores = {}
+            if self.channelweeksaves.get(currentChannel):
+                if self.channelweeksaves[currentChannel].get(self.woy):
+                    msgstring = ''
+                    # for each day of week
+                    for i in (1,2,3,4,5,6,7):
+                        if self.channelweeksaves[currentChannel][self.woy].get(i):
+                            # Getting all scores, to get the winner of the week
+                            for player in list(self.channelweeksaves[currentChannel][self.woy][i].keys()):
+                                try:
+                                    weekscores[player] += self.channelweeksaves[currentChannel][self.woy][i][player]
+                                except:
+                                    weekscores[player] = self.channelweeksaves[currentChannel][self.woy][i][player]
 
+                            winnernick, winnerscore = max(iter(weekscores.items()), key=lambda k_v3:(k_v3[1],k_v3[0]))
+                            if (winnernick != self.leadersaver[currentChannel]):
+                                if self.leadersaver[currentChannel] != None:
+                                    irc.reply("%s took the lead for the week over %s with %i save points." % (winnernick, self.leadersaver[currentChannel], winnerscore)) 
+                                else:
+                                    irc.reply("%s has the lead for the week with %i save points." % (winnernick, winnerscore)) 
+                                self.leadersaver[currentChannel] = winnernick
 
-        else:
-            irc.reply("Not a single duck was shot during this hunt!")
 
         # Reinit current hunt scores
-        if self.scores.get(currentChannel):
-            self.scores[currentChannel] = {}
+        if self.shootscores.get(currentChannel):
+            self.shootscores[currentChannel] = {}
+
+        if self.savescores.get(currentChannel):
+            self.savescores[currentChannel] = {}
 
         # Reinit current hunt times
         if self.toptimes.get(currentChannel):
@@ -1135,8 +1513,6 @@ class DuckHunt(callbacks.Plugin):
 
         # Reinit number of shoots
         self.shoots[currentChannel] = 0
-
-
 
     def _launch(self, irc, msg, args):
         """
